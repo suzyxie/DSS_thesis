@@ -1,0 +1,95 @@
+!pip install -q -U albumentations
+!echo "$(pip freeze | grep albumentations) is successfully installed"
+
+# Define a pipeline for image and mask augmentations
+from albumentations import Compose
+import albumentations as A
+
+
+image_transforms = A.Compose([
+    # Composition and Blending
+    A.HorizontalFlip(p=0.5),
+    A.VerticalFlip(p=0.5),
+    A.OneOf([
+        A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2),
+        A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
+    ], p=0.5),
+    # Weather Effects
+    A.RandomRain(p=0.5),
+    # Lighting Effects
+    A.RandomShadow(p=0.5),
+    # RandomSizedCrop
+    A.RandomSizedCrop(min_max_height=(200, 300), height=720, width=720, p=0.5)])
+
+
+# Apply the same composition to masks
+mask_transforms = A.Compose([
+     A.HorizontalFlip(p=0.5),
+    A.VerticalFlip(p=0.5),
+    A.OneOf([
+        A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2),
+        A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
+    ], p=0.5),
+    A.RandomRain(p=0.5),
+    A.RandomShadow(p=0.5),
+    A.RandomSizedCrop(min_max_height=(200, 300), height=720, width=720, p=0.5)])
+
+# Define the directories for augmented data
+augmented_images_dir = '/content/drive/MyDrive/Resized_data_720/augmented data/images'
+augmented_masks_dir = '/content/drive/MyDrive/Resized_data_720/augmented data/masks'
+
+
+resized_images_train_720= "/content/drive/MyDrive/Resized_data_720/resized_train/images"
+resized_masks_train_720= "/content/drive/MyDrive/Resized_data_720/resized_train/masks"
+image_files = os.listdir(resized_images_train_720)
+
+# Iterate through each image file
+for image_file in image_files:
+    # Load the image and corresponding mask
+    image_path = os.path.join(resized_images_train_720, image_file)
+    mask_path = os.path.join(resized_masks_train_720, image_file.replace('.jpg', '_lab.png'))
+
+    image = cv2.imread(image_path)
+    mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+
+
+    # Apply the image and mask transformations
+    augmented = image_transforms(image=image, mask=mask)
+    augmented_image = augmented["image"]
+    augmented_mask = augmented["mask"]
+
+    # Save the augmented image and mask
+    augmented_image_path = os.path.join(augmented_images_dir, image_file)
+    augmented_mask_path = os.path.join(augmented_masks_dir, image_file.replace('.jpg', '.png'))
+
+    cv2.imwrite(augmented_image_path, augmented_image)
+    cv2.imwrite(augmented_mask_path, augmented_mask)
+
+Agumented_images ="/content/drive/MyDrive/Resized_data_720/augmented data/images"
+Agumented_masks= "/content/drive/MyDrive/Resized_data_720/augmented data/masks"
+
+data = []
+labels = []
+
+for filename in os.listdir(Agumented_images):
+    if filename.endswith(".jpg"):  # Assuming your images are in JPEG format
+        # Load the image
+        image = cv2.imread(os.path.join(Agumented_images, filename))
+        data.append(image)
+
+        # Load the corresponding mask
+        mask_filename = os.path.join(Agumented_masks, filename.replace(".jpg", ".png"))
+        mask = cv2.imread(mask_filename, cv2.IMREAD_GRAYSCALE)
+        labels.append(mask)
+
+X_train_agumented = np.array(data)
+y_train_agumented = np.array(labels)
+np.save('/content/drive/MyDrive/Resized_data_720/X_train_agumented.npy', X_train_agumented)
+np.save('/content/drive/MyDrive/Resized_data_720/y_train_agumented.npy', y_train_agumented)
+
+num_classes = 7
+y_train_agumented_reshaped = np.zeros((y_train_agumented.shape[0], y_train_agumented.shape[1], y_train_agumented.shape[2], num_classes), dtype=np.uint8)
+
+# Iterate over each class and create the respective channel
+for class_idx in range(num_classes):
+    y_train_agumented_reshaped[:, :, :, class_idx] = (y_train == class_idx).astype(np.uint8)
